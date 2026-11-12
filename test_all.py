@@ -7,14 +7,14 @@ GAME03_SGF = "(;FF[4]GM[1]SZ[9];B[dd];W[fe];B[ef];W[cg];B[ff];W[fc];B[ge];W[gd];
 
 
 class TestGoOlympiadTasks(unittest.TestCase):
-    # --- Тесты Задания 1 (дамэ, взятие, легальность, ко) ---
+    # --- Тесты Задания 1 (дамэ, взятие цепочкой, легальность, ко) ---
     def test_task1_dame_tasks_1_to_5(self):
         cases = [
             ("t1", "(;FF[4]GM[1]SZ[9]AB[ec][ed][ee][ef])", 10),
             ("t2", "(;FF[4]GM[1]SZ[9]AB[dd][de][ed][ee])", 8),
-            ("t3", "(;FF[4]GM[1]SZ[9]AB[ed][ee][ef][fe])", 9),
+            ("t3", "(;FF[4]GM[1]SZ[9]AB[ed][ee][ef][fe])", 8),
             ("t4", "(;FF[4]GM[1]SZ[9]AB[dd][de][ed][ee][fe])", 9),
-            ("t5", "(;FF[4]GM[1]SZ[9]AB[gb][gc][ha][hc][ia][ib][ic])", 8),
+            ("t5", "(;FF[4]GM[1]SZ[9]AB[gb][gc][ha][hc][ia][ib][ic])", 7),
         ]
         for name, sgf, expected in cases:
             with self.subTest(name=name):
@@ -22,14 +22,12 @@ class TestGoOlympiadTasks(unittest.TestCase):
                 self.assertEqual(b.count_target_dame(), expected)
 
     def test_task1_multi_group_capture_and_suicide(self):
-        # Ход Q снимает две группы белых одновременно (даже не имея собственных свободных пунктов до снятия)
-        sgf = "(;FF[4]GM[1]SZ[9]AB[ba][ab][cb][bc]AW[aa][bb]LB[ac:Q]PL[B])"
-        # Добавим окружение для bb: bd, cd и проверим снятие aa ходом в его последнее дамэ
-        sgf_capture = "(;FF[4]GM[1]SZ[9]AB[ba]AW[aa]LB[ab:Q]PL[B])"
-        b = GoBoard.from_sgf(sgf_capture)
+        # Ход Q (ab) одновременно снимает две отдельные группы белых (aa и ac+bc), не имея своих дамэ до снятия
+        sgf_multi_capture = "(;FF[4]GM[1]SZ[9]AB[ba][bb][ad][bd][cc]AW[aa][ac][bc]LB[ab:Q]PL[B])"
+        b = GoBoard.from_sgf(sgf_multi_capture)
         status, caps = b.check_labeled_move_q()
         self.assertEqual(status, "legal")
-        self.assertEqual(caps, "aa")
+        self.assertEqual(caps, "aa ac bc")
 
         # Запрет самоубийственного хода (правило № 3)
         sgf_suicide = "(;FF[4]GM[1]SZ[9]AW[ba][ab]LB[aa:Q]PL[B])"
@@ -39,10 +37,9 @@ class TestGoOlympiadTasks(unittest.TestCase):
         self.assertEqual(caps2, "")
 
     def test_task1_ko_rule(self):
-        # Классическая позиция ко: чёрные берут ко, белым запрещено брать обратно немедленно
-        sgf_ko = "(;FF[4]GM[1]SZ[9]AB[cb][bc][cd][dc]AW[da][eb][ed][ce];B[db];W[cc])"
+        # Классическая позиция ко: чёрные берут B[da], белым запрещено брать обратно W[db] немедленно
+        sgf_ko = "(;FF[4]GM[1]SZ[9]AB[ca][ea][cb][eb][dc]AW[db];B[da])"
         b = GoBoard.from_sgf(sgf_ko)
-        # Попытка чёрных немедленно вернуть позицию ходом B[db] запрещена правилом ко
         status, _ = b.check_labeled_move_q(move_override="db")
         self.assertEqual(status, "illegal")
 
@@ -53,15 +50,15 @@ class TestGoOlympiadTasks(unittest.TestCase):
         ans9, _ = solve_tsumego(t009, max_depth=6, workers=1)
         self.assertEqual(ans9, "ci")
 
-        # task018: угловая группа из 3 пунктов (bent-three) -> ключевой пункт ai
+        # task018: угловая группа из 3 пунктов -> ключевой пункт ai
         t018 = "(;FF[4]GM[1]SZ[9]AB[af][bf][cf][cg][dg][dh][di]AW[ag][bg][bh][ch][ci])"
         ans18_seq, _ = solve_tsumego(t018, max_depth=6, workers=1)
         ans18_par, _ = solve_tsumego(t018, max_depth=6, workers=2, backend="thread")
         self.assertEqual(ans18_seq, "ai")
         self.assertEqual(ans18_par, "ai")
 
-        # Неприступная крепость с двумя глазами (task005 + внешнее окружение) -> 'no'
-        t_fortress = "(;FF[4]GM[1]SZ[9]AB[gb][gc][ha][hc][ia][ib][ic]AW[fa][fb][fc][fd][gd][hd][id]SQ[gb]PL[W])"
+        # Неприступная крепость с двумя настоящими глазами (gb и hb) при ходе белых -> 'no'
+        t_fortress = "(;FF[4]GM[1]SZ[9]AB[fa][ha][fb][gb][hb][ib]AW[ea][eb][ec][fc][gc][hc][ic]SQ[ha]PL[W])"
         ans_fort, _ = solve_tsumego(t_fortress, max_depth=4, workers=1)
         self.assertEqual(ans_fort, "no")
 
